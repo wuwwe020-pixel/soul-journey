@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>心灵之旅</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
-<style>.amap-logo,.amap-copyright{display:none!important}</style>
-<script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_KEY"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #0d0f0e; --bg2: #141714; --bg3: #1a1f1b;
@@ -59,6 +59,8 @@ body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
 .q-slider-value{text-align:center;font-family:'Space Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:2px}
 .q-slider-confirm{width:100%;padding:14px;background:var(--green);border:none;border-radius:4px;color:white;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:background 0.2s}
 .q-slider-confirm:hover{background:#3a7a4c}
+.q-back-btn{width:100%;margin-top:8px;padding:10px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+.q-back-btn:hover{border-color:var(--text2);color:var(--text2)}
 
 /* HEADER */
 header{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;background:rgba(13,15,14,0.94);backdrop-filter:blur(12px)}
@@ -421,6 +423,7 @@ function renderQuiz(){
   const qEl=document.getElementById('quiz-question');
   qEl.style.animation='none';qEl.offsetHeight;qEl.style.animation='fadeUp 0.35s ease';
 
+  const backBtn=currentQ>0?`<button class="q-back-btn" onclick="goBack()">← 上一题</button>`:'';
   if(q.type==='slider'){
     qEl.innerHTML=`
       <div class="q-num">问题 ${currentQ+1} / ${QUESTIONS.length}</div>
@@ -433,7 +436,8 @@ function renderQuiz(){
         <input type="range" class="q-slider" id="slider-input" min="0" max="100" value="50">
         <div class="q-slider-value" id="slider-val">中间</div>
         <button class="q-slider-confirm" onclick="confirmSlider()">确认 →</button>
-      </div>`;
+      </div>
+      ${backBtn}`;
     const sl=document.getElementById('slider-input');
     const updateSlider=()=>{
       const v=parseInt(sl.value);
@@ -448,8 +452,31 @@ function renderQuiz(){
     sl.addEventListener('input',updateSlider);
     updateSlider();
   } else {
-    qEl.innerHTML=`<div class="q-num">问题 ${currentQ+1} / ${QUESTIONS.length}</div><div class="q-text">${q.text}</div><div class="q-options">${q.options.map((o,i)=>`<button class="q-option" onclick="selectOption(${i})">${o.text}</button>`).join('')}</div>`;
+    qEl.innerHTML=`<div class="q-num">问题 ${currentQ+1} / ${QUESTIONS.length}</div><div class="q-text">${q.text}</div><div class="q-options">${q.options.map((o,i)=>`<button class="q-option" onclick="selectOption(${i})">${o.text}</button>`).join('')}</div>${backBtn}`;
   }
+}
+
+function goBack(){
+  if(currentQ<=0)return;
+  // 撤销上一题分数
+  const prevQ=QUESTIONS[currentQ-1];
+  const prevAnswer=answers[answers.length-1];
+  if(prevQ.type==='slider'){
+    const ratio=prevAnswer/100;
+    const leftScores=prevQ.minScore||{};
+    const rightScores=prevQ.maxScore||prevQ.minScore2||{};
+    const allKeys=new Set([...Object.keys(leftScores),...Object.keys(rightScores)]);
+    allKeys.forEach(k=>{
+      const lv=leftScores[k]||0;const rv=rightScores[k]||0;
+      scores[k]=(scores[k]||0)-Math.round(lv*(1-ratio)+rv*ratio);
+    });
+  } else {
+    const opt=prevQ.options[prevAnswer];
+    Object.entries(opt.scores).forEach(([k,v])=>{scores[k]=(scores[k]||0)-v;});
+  }
+  answers.pop();
+  currentQ--;
+  renderQuiz();
 }
 
 function confirmSlider(){
@@ -522,7 +549,7 @@ async function doSearch(){
 用户的旅行人格是「${persona.name}」——${persona.soul}
 性格标签：${persona.tags.join('、')}
 
-请根据此人格推荐3个旅行方案，返回纯JSON格式：
+请根据此人格推荐5个旅行方案，返回纯JSON格式：
 {
   "plans": [
     {
@@ -566,10 +593,10 @@ async function doSearch(){
 
 要求：推荐真实存在的地方，坐标准确，行程具体不泛泛，每个方案类型不同，突出与用户人格的匹配感。只返回JSON。`;
 
-  const userMsg=`目标地区：${region}\n出行天数：${days}天\n出发时间：${time}\n旅行人格：${persona.name}\n\n请推荐3个最适合我的旅行方案。`;
+  const userMsg=`目标地区：${region}\n出行天数：${days}天\n出发时间：${time}\n旅行人格：${persona.name}\n\n请推荐5个最适合我的旅行方案。`;
 
   try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'glm-4-flash',max_tokens:3000,messages:[{role:'system',content:systemPrompt},{role:'user',content:userMsg}]})});
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'glm-4-flash',max_tokens:4500,messages:[{role:'system',content:systemPrompt},{role:'user',content:userMsg}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(`API错误 ${res.status}: ${JSON.stringify(e)}`);}
     const data=await res.json();
     const raw=data.choices?.[0]?.message?.content||'{}';
@@ -624,46 +651,35 @@ function selectPlan(id){
 
 function initMap(){
   if(map)return;
-  map=new AMap.Map('map',{
-    zoom:4,
-    center:[104,35],
-    mapStyle:'amap://styles/dark',
-    resizeEnable:true
-  });
+  map=L.map('map',{zoomControl:false}).setView([35,104],4);
+  L.control.zoom({position:'topright'}).addTo(map);
+  // 高德瓦片，国内快，无需Key
+  L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{
+    subdomains:'1234', maxZoom:18, attribution:'© 高德地图'
+  }).addTo(map);
   document.getElementById('map-hint').style.display='none';
 }
 
 function showPlanOnMap(plan){
-  markers.forEach(m=>{m.setMap(null)});markers=[];
-  if(routeLine){routeLine.setMap(null);routeLine=null;}
+  markers.forEach(m=>map.removeLayer(m));markers=[];
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
   const wps=plan.waypoints||[];
   const pts=wps.length>0?wps:[{lat:plan.lat,lng:plan.lng,name:plan.location,note:''}];
-  const points=[];
+  const latlngs=[];
   pts.forEach((wp,i)=>{
     if(!wp.lat||!wp.lng)return;
-    points.push(new AMap.LngLat(wp.lng,wp.lat));
-    const content=`<div style="width:26px;height:26px;border-radius:50%;background:#0d0f0e;border:2px solid #6db882;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:10px;color:#6db882;font-weight:700;box-shadow:0 0 12px rgba(109,184,130,0.35);line-height:26px;text-align:center">${i+1}</div>`;
-    const marker=new AMap.Marker({
-      position:new AMap.LngLat(wp.lng,wp.lat),
-      content:content,
-      offset:new AMap.Pixel(-13,-13),
-      map:map
-    });
-    const info=new AMap.InfoWindow({
-      content:`<div style="font-family:'Noto Sans SC',sans-serif;font-size:13px;color:#333;padding:6px 10px;min-width:120px"><strong>${wp.name}</strong>${wp.note?`<br><span style="font-size:11px;color:#666">${wp.note}</span>`:''}</div>`,
-      offset:new AMap.Pixel(0,-28)
-    });
-    marker.on('click',()=>info.open(map,marker.getPosition()));
-    markers.push(marker);
+    latlngs.push([wp.lat,wp.lng]);
+    const icon=L.divIcon({className:'',html:`<div style="width:26px;height:26px;border-radius:50%;background:#0d0f0e;border:2px solid #6db882;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:10px;color:#6db882;font-weight:700;box-shadow:0 0 12px rgba(109,184,130,0.35)">${i+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
+    const m=L.marker([wp.lat,wp.lng],{icon})
+      .bindPopup(`<div style="font-family:'Noto Sans SC',sans-serif;font-size:13px;padding:8px 12px;min-width:120px"><strong style="color:#2d6a4f">${wp.name}</strong>${wp.note?`<br><span style="font-size:11px;color:#666">${wp.note}</span>`:''}</div>`)
+      .addTo(map);
+    markers.push(m);
   });
-  if(points.length>1){
-    routeLine=new AMap.Polyline({
-      path:points,strokeColor:'#4a8c5c',strokeWeight:2,strokeOpacity:0.7,
-      strokeStyle:'dashed',strokeDasharray:[6,8],map:map
-    });
-    map.setFitView(markers);
-  } else if(points.length===1){
-    map.setCenter(points[0]);map.setZoom(9);
+  if(latlngs.length>1){
+    routeLine=L.polyline(latlngs,{color:'#4a8c5c',weight:2,opacity:0.7,dashArray:'6,8'}).addTo(map);
+    map.fitBounds(L.latLngBounds(latlngs),{padding:[40,40]});
+  } else if(latlngs.length===1){
+    map.setView(latlngs[0],9);
   }
 }
 
