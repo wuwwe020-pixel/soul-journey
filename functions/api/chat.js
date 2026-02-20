@@ -1,33 +1,46 @@
-export default async function handler(req, res) {
+export async function onRequest(context) {
   // 只允许 POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (context.request.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  // 从环境变量读取 Key，不暴露给前端
-  const apiKey = process.env.ZHIPU_API_KEY;
+  const apiKey = context.env.ZHIPU_API_KEY;
+
   if (!apiKey) {
-    return res.status(500).json({ error: 'API Key 未配置' });
+    return new Response(JSON.stringify({ error: 'API Key 未配置' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
+    const body = await context.request.json();
+
     const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify(body)
     });
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(response.status).json(data);
-    }
-
-    return res.status(200).json(data);
+    return new Response(JSON.stringify(data), {
+      status: response.status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
   } catch (err) {
-    return res.status(500).json({ error: '请求失败：' + err.message });
+    return new Response(JSON.stringify({ error: '请求失败：' + err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
