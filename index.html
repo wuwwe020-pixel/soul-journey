@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>荒野志 · Hidden Routes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg: #0d0f0e;
+  --bg2: #141714;
+  --bg3: #1a1f1b;
+  --border: #2a312b;
+  --text: #e8e4d8;
+  --text2: #8a9088;
+  --text3: #5a6058;
+  --green: #4a8c5c;
+  --green-bright: #6db882;
+  --amber: #c9913a;
+  --amber-dim: #8a6428;
+  --red: #c45a3a;
+  --card-bg: #161a17;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── GRAIN ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  opacity: 0.6;
+}
+
+/* ── HEADER ── */
+header {
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(13,15,14,0.92);
+  backdrop-filter: blur(12px);
+}
+
+.logo {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--green-bright);
+}
+
+.logo-en {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.nav-btn {
+  padding: 7px 16px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text2);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.nav-btn:hover, .nav-btn.active {
+  border-color: var(--green);
+  color: var(--green-bright);
+}
+
+.nav-btn .badge {
+  position: absolute;
+  top: -6px; right: -6px;
+  background: var(--amber);
+  color: #000;
+  font-size: 9px;
+  font-weight: 700;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-btn .badge.show { display: flex; }
+
+/* ── LAYOUT ── */
+.app-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  min-height: calc(100vh - 61px);
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--bg2);
+}
+
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* ── SEARCH PANEL ── */
+.search-panel {
+  padding: 28px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-tag {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 20px;
+}
+
+.hero-line {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 26px;
+  line-height: 1.3;
+  font-weight: 400;
+  margin-bottom: 6px;
+}
+
+.hero-line em {
+  font-style: italic;
+  color: var(--green-bright);
+}
+
+.hero-sub {
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.field {
+  margin-bottom: 14px;
+}
+
+.field label {
+  display: block;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+
+.field input, .field select {
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  appearance: none;
+}
+
+.field input::placeholder { color: var(--text3); }
+
+.field input:focus, .field select:focus {
+  border-color: var(--green);
+}
+
+.field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 5 5-5' stroke='%235a6058' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+
+.fields-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.search-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px;
+  background: var(--green);
+  border: none;
+  border-radius: 3px;
+  color: #fff;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+
+.search-btn:hover { background: #3a7a4c; }
+.search-btn:active { transform: scale(0.99); }
+.search-btn:disabled { background: var(--text3); cursor: not-allowed; }
+
+.search-btn .loading-dots {
+  display: none;
+}
+.search-btn.loading .btn-text { display: none; }
+.search-btn.loading .loading-dots { display: inline; }
+
+.loading-dots::after {
+  content: '';
+  animation: dots 1.2s infinite;
+}
+@keyframes dots {
+  0% { content: '探寻中.'; }
+  33% { content: '探寻中..'; }
+  66% { content: '探寻中...'; }
+}
+
+.error-msg {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--red);
+  font-family: 'Space Mono', monospace;
+}
+
+/* ── RESULTS LIST ── */
+.results-list {
+  padding: 16px 0;
+}
+
+.result-card {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.result-card:hover { background: var(--bg3); }
+.result-card.active { background: var(--bg3); border-left: 2px solid var(--green); }
+
+.rc-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text3);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.rc-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.rc-loc {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.rc-desc {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rc-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.tag-type { background: rgba(74,140,92,0.15); color: var(--green-bright); border: 1px solid rgba(74,140,92,0.3); }
+.tag-season { background: rgba(201,145,58,0.1); color: var(--amber); border: 1px solid rgba(201,145,58,0.25); }
+.tag-crowd { background: rgba(196,90,58,0.1); color: #e07a5a; border: 1px solid rgba(196,90,58,0.2); }
+
+.rc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.rc-days {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 1px;
+}
+
+.save-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text3);
+  font-size: 14px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover, .save-btn.saved {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+/* ── EMPTY / LOADING states ── */
+.state-box {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text3);
+}
+
+.state-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+
+.state-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 16px;
+  font-style: italic;
+  margin-bottom: 6px;
+  color: var(--text2);
+}
+
+.state-sub { font-size: 12px; line-height: 1.5; }
+
+/* ── MAIN CONTENT ── */
+.main-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── MAP ── */
+#map {
+  flex: 1;
+  min-height: 320px;
+  background: #111;
+  position: relative;
+}
+
+.map-placeholder {
+  position: absolute; inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text3);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.map-placeholder svg { opacity: 0.2; }
+
+.map-placeholder p {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+/* ── DETAIL PANEL ── */
+.detail-panel {
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+  overflow-y: auto;
+  max-height: 46vh;
+  flex-shrink: 0;
+}
+
+.detail-panel::-webkit-scrollbar { width: 3px; }
+.detail-panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+.detail-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text3);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.detail-inner {
+  padding: 28px 36px;
+  animation: fadeUp 0.35s ease;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.detail-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.detail-loc {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--amber);
+  letter-spacing: 1.5px;
+  margin-top: 6px;
+}
+
+.detail-save-btn {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text2);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.detail-save-btn:hover, .detail-save-btn.saved {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.detail-desc {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.8;
+  margin-bottom: 24px;
+  max-width: 640px;
+}
+
+.detail-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+/* Itinerary */
+.itinerary-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--green-bright);
+  margin-bottom: 16px;
+}
+
+.itinerary-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 28px;
+  position: relative;
+}
+
+.itinerary-timeline::before {
+  content: '';
+  position: absolute;
+  left: 14px; top: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--green), transparent);
+}
+
+.day-item {
+  display: flex;
+  gap: 20px;
+  padding: 0 0 20px 0;
+  position: relative;
+}
+
+.day-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1px solid var(--green);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--green-bright);
+  position: relative;
+  z-index: 1;
+}
+
+.day-content {}
+
+.day-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.day-desc {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+
+/* Tips */
+.tips-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--amber);
+  padding: 16px 20px;
+  max-width: 640px;
+}
+
+.tips-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 10px;
+}
+
+.tips-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tips-list li {
+  font-size: 12px;
+  color: var(--text2);
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.6;
+}
+
+.tips-list li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--text3);
+  font-size: 10px;
+}
+
+/* ── SAVED PAGE ── */
+.saved-page {
+  display: none;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.saved-page.visible { display: block; }
+
+.page-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 28px;
+  font-weight: 400;
+  margin-bottom: 4px;
+}
+
+.page-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+}
+
+.saved-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2px;
+}
+
+.saved-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 24px;
+  transition: border-color 0.2s;
+}
+
+.saved-card:hover { border-color: var(--green); }
+
+.sc-title {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.sc-loc {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--amber);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.sc-desc {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.sc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sc-days {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.sc-remove {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text3);
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-family: 'Space Mono', monospace;
+  transition: all 0.2s;
+}
+
+.sc-remove:hover { border-color: var(--red); color: var(--red); }
+
+.saved-empty-state {
+  text-align: center;
+  padding: 80px 40px;
+  color: var(--text3);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 800px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 60vh;
+  }
+  #map { min-height: 280px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">荒野志</div>
+    <div class="logo-en">Hidden Routes</div>
+  </div>
+  <div class="header-right">
+    <button class="nav-btn active" id="btn-explore" onclick="showPage('explore')">探索</button>
+    <button class="nav-btn" id="btn-saved" onclick="showPage('saved')">
+      收藏
+      <span class="badge" id="saved-badge">0</span>
+    </button>
+  </div>
+</header>
+
+<!-- EXPLORE PAGE -->
+<div id="page-explore">
+  <div class="app-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="search-panel">
+        <div class="panel-tag">/ Solo Travel Finder</div>
+        <div class="hero-line">寻访<em>无人知晓</em><br>的远方</div>
+        <p class="hero-sub">独旅者专属 · 避开人潮 · AI 定制行程</p>
+
+        <div class="field">
+          <label>出发城市</label>
+          <input type="text" id="inp-from" placeholder="如：成都、北京、广州" />
+        </div>
+        <div class="field">
+          <label>目的地方向（可选）</label>
+          <input type="text" id="inp-region" placeholder="如：西南、藏东、内蒙" />
+        </div>
+        <div class="fields-row">
+          <div class="field">
+            <label>出行天数</label>
+            <select id="inp-days">
+              <option value="2">2 天</option>
+              <option value="3" selected>3 天</option>
+              <option value="5">5 天</option>
+              <option value="7">7 天</option>
+              <option value="10">10 天</option>
+              <option value="14">14 天</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>偏好类型</label>
+            <select id="inp-type">
+              <option value="all">不限</option>
+              <option value="mountain">山野徒步</option>
+              <option value="ancient">古迹人文</option>
+              <option value="water">水乡湿地</option>
+              <option value="desert">沙漠戈壁</option>
+              <option value="grassland">草原牧场</option>
+              <option value="coast">海岸渔村</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="search-btn" id="search-btn" onclick="doSearch()">
+          <span class="btn-text">探 索 秘 境</span>
+          <span class="loading-dots"></span>
+        </button>
+        <div class="error-msg" id="error-msg"></div>
+      </div>
+
+      <!-- Results -->
+      <div class="results-list" id="results-list">
+        <div class="state-box">
+          <div class="state-icon">🧭</div>
+          <div class="state-title">等待第一次探索</div>
+          <div class="state-sub">输入出发城市<br>发现鲜为人知的旅行目的地</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main-content">
+      <!-- MAP -->
+      <div id="map">
+        <div class="map-placeholder" id="map-placeholder">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M32 4C20.95 4 12 12.95 12 24C12 38 32 60 32 60C32 60 52 38 52 24C52 12.95 43.05 4 32 4Z" stroke="#4a8c5c" stroke-width="2" fill="none"/>
+            <circle cx="32" cy="24" r="6" stroke="#4a8c5c" stroke-width="2" fill="none"/>
+          </svg>
+          <p>选择方案后显示路线地图</p>
+        </div>
+      </div>
+
+      <!-- DETAIL -->
+      <div class="detail-panel" id="detail-panel">
+        <div class="detail-empty" id="detail-empty">← 点击左侧方案查看详细行程</div>
+        <div class="detail-inner" id="detail-inner" style="display:none"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- SAVED PAGE -->
+<div id="page-saved" class="saved-page">
+  <div class="page-title">我的收藏</div>
+  <div class="page-sub">/ Saved Routes · 离线可查</div>
+  <div id="saved-content"></div>
+</div>
+
+<script>
+// ── State ──
+let plans = [];
+let savedPlans = JSON.parse(localStorage.getItem('hiddentravel_saved') || '[]');
+let activeId = null;
+let map = null;
+let markers = [];
+let routeLine = null;
+
+// ── Map init ──
+function initMap() {
+  if (map) return;
+  map = L.map('map', { zoomControl: false }).setView([35, 104], 4);
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  // Dark tile
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    maxZoom: 18
+  }).addTo(map);
+
+  document.getElementById('map-placeholder').style.display = 'none';
+}
+
+// ── Search ──
+async function doSearch() {
+  const from = document.getElementById('inp-from').value.trim();
+  const region = document.getElementById('inp-region').value.trim();
+  const days = document.getElementById('inp-days').value;
+  const type = document.getElementById('inp-type').value;
+  const errEl = document.getElementById('error-msg');
+
+  if (!from) { errEl.textContent = '请填写出发城市'; return; }
+  errEl.textContent = '';
+
+  const btn = document.getElementById('search-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const typeMap = { all:'不限', mountain:'山野徒步', ancient:'古迹人文', water:'水乡湿地', desert:'沙漠戈壁', grassland:'草原牧场', coast:'海岸渔村' };
+
+  const systemPrompt = `你是专门推荐中国小众、远离人群旅游目的地的向导，专为独旅者服务。根据用户需求推荐3个鲜为人知的旅游方案。
+
+返回纯JSON，格式：
+{
+  "plans": [
+    {
+      "id": "唯一字符串id",
+      "title": "诗意的方案名称",
+      "location": "具体地点名",
+      "region": "省份",
+      "lat": 纬度数字,
+      "lng": 经度数字,
+      "description": "80字内描述，突出小众和独旅体验",
+      "type": "山野/古迹/水乡/沙漠/草原/海岸/峡谷/高原",
+      "season": "最佳季节",
+      "crowdLevel": "极少人/较少人/偶有游客",
+      "days": 推荐天数,
+      "waypoints": [
+        {"name": "地点名", "lat": 纬度, "lng": 经度, "note": "简短说明"}
+      ],
+      "itinerary": [
+        {"day": 1, "title": "主题", "description": "100字内描述"}
+      ],
+      "tips": ["贴士1", "贴士2", "贴士3"]
+    }
+  ]
+}
+
+要求：避开热门景区（九寨沟/黄山/西湖/张家界等），只推荐真实存在但鲜为人知的地方，每个方案类型不同，坐标要准确。只返回JSON。`;
+
+  const userMsg = `出发：${from}\n方向：${region||'不限'}\n天数：${days}天\n类型：${typeMap[type]}\n\n请推荐3个小众独旅方案。`;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'glm-4-flash',
+        max_tokens: 2500,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMsg }
+        ]
+      })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(`API错误 ${res.status}: ${JSON.stringify(errData)}`);
+    }
+    const data = await res.json();
+    console.log('API响应:', data);
+    const raw = data.choices?.[0]?.message?.content || '{}';
+    console.log('原始内容:', raw);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+    } catch(parseErr) {
+      console.error('JSON解析失败:', clean);
+      throw new Error('AI返回格式错误，请重试');
+    }
+    plans = parsed.plans || [];
+    renderResults();
+    if (plans.length > 0) {
+      initMap();
+      showPlanOnMap(plans[0]);
+      showDetail(plans[0].id);
+    }
+  } catch(e) {
+    console.error('搜索出错:', e);
+    document.getElementById('error-msg').textContent = '错误：' + e.message;
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+// ── Render sidebar results ──
+function renderResults() {
+  const el = document.getElementById('results-list');
+  if (!plans.length) {
+    el.innerHTML = '<div class="state-box"><div class="state-icon">🌿</div><div class="state-title">暂无结果</div></div>';
+    return;
+  }
+  el.innerHTML = plans.map((p, i) => `
+    <div class="result-card ${activeId===p.id?'active':''}" id="rc-${p.id}" onclick="onCardClick('${p.id}')">
+      <div class="rc-num">方案 ${String(i+1).padStart(2,'0')}</div>
+      <div class="rc-title">${p.title}</div>
+      <div class="rc-loc">📍 ${p.location} · ${p.region}</div>
+      <div class="rc-desc">${p.description}</div>
+      <div class="rc-tags">
+        <span class="tag tag-type">${p.type}</span>
+        <span class="tag tag-season">${p.season}</span>
+        <span class="tag tag-crowd">${p.crowdLevel}</span>
+      </div>
+      <div class="rc-footer">
+        <div class="rc-days">${p.days} 天</div>
+        <button class="save-btn ${isSaved(p.id)?'saved':''}" onclick="event.stopPropagation();toggleSave('${p.id}')" title="收藏">
+          ${isSaved(p.id)?'★':'☆'}
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Card click ──
+function onCardClick(id) {
+  const plan = plans.find(p => p.id === id);
+  if (!plan) return;
+  activeId = id;
+  document.querySelectorAll('.result-card').forEach(el => el.classList.remove('active'));
+  const rc = document.getElementById('rc-'+id);
+  if (rc) rc.classList.add('active');
+  initMap();
+  showPlanOnMap(plan);
+  showDetail(id);
+}
+
+// ── Map ──
+function showPlanOnMap(plan) {
+  // Clear old
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+
+  const waypoints = plan.waypoints || [];
+  const allPts = waypoints.length > 0 ? waypoints : [{ lat: plan.lat, lng: plan.lng, name: plan.location, note: '' }];
+
+  const latlngs = [];
+
+  allPts.forEach((wp, i) => {
+    if (!wp.lat || !wp.lng) return;
+    latlngs.push([wp.lat, wp.lng]);
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:28px;height:28px;border-radius:50%;
+        background:#0d0f0e;border:2px solid #4a8c5c;
+        display:flex;align-items:center;justify-content:center;
+        font-family:'Space Mono',monospace;font-size:10px;
+        color:#6db882;font-weight:700;
+        box-shadow:0 0 12px rgba(74,140,92,0.4);
+      ">${i+1}</div>`,
+      iconSize: [28,28],
+      iconAnchor: [14,14]
+    });
+
+    const m = L.marker([wp.lat, wp.lng], { icon })
+      .bindPopup(`<div style="font-family:'Noto Sans SC',sans-serif;font-size:13px;color:#e8e4d8;background:#1a1f1b;padding:8px 12px;border-radius:3px;border:1px solid #2a312b;min-width:120px;">
+        <strong style="color:#6db882">${wp.name}</strong>
+        ${wp.note ? `<br><span style="color:#8a9088;font-size:11px">${wp.note}</span>` : ''}
+      </div>`)
+      .addTo(map);
+    markers.push(m);
+  });
+
+  if (latlngs.length > 1) {
+    routeLine = L.polyline(latlngs, {
+      color: '#4a8c5c',
+      weight: 2,
+      opacity: 0.7,
+      dashArray: '6,8'
+    }).addTo(map);
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+  } else if (latlngs.length === 1) {
+    map.setView(latlngs[0], 9);
+  }
+}
+
+// ── Detail Panel ──
+function showDetail(id) {
+  const plan = plans.find(p => p.id === id);
+  if (!plan) return;
+
+  document.getElementById('detail-empty').style.display = 'none';
+  const el = document.getElementById('detail-inner');
+  el.style.display = 'block';
+
+  const saved = isSaved(id);
+  const itHTML = (plan.itinerary || []).map(d => `
+    <div class="day-item">
+      <div class="day-dot">${d.day}</div>
+      <div class="day-content">
+        <div class="day-title">${d.title}</div>
+        <div class="day-desc">${d.description}</div>
+      </div>
+    </div>
+  `).join('');
+
+  const tipsHTML = plan.tips?.length ? `
+    <div class="tips-box">
+      <div class="tips-title">独旅须知</div>
+      <ul class="tips-list">${plan.tips.map(t=>`<li>${t}</li>`).join('')}</ul>
+    </div>
+  ` : '';
+
+  el.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">${plan.title}</div>
+        <div class="detail-loc">📍 ${plan.location} · ${plan.region}</div>
+      </div>
+      <button class="detail-save-btn ${saved?'saved':''}" id="detail-save-btn" onclick="toggleSave('${plan.id}')">
+        ${saved ? '★ 已收藏' : '☆ 收 藏'}
+      </button>
+    </div>
+    <div class="detail-desc">${plan.description}</div>
+    <div class="detail-tags">
+      <span class="tag tag-type">${plan.type}</span>
+      <span class="tag tag-season">${plan.season}</span>
+      <span class="tag tag-crowd">${plan.crowdLevel}</span>
+      <span class="tag tag-season" style="color:#aaa;border-color:#333">${plan.days}天行程</span>
+    </div>
+    <div class="itinerary-label">行程安排</div>
+    <div class="itinerary-timeline">${itHTML}</div>
+    ${tipsHTML}
+  `;
+}
+
+// ── Save ──
+function isSaved(id) { return savedPlans.some(p => p.id === id); }
+
+function toggleSave(id) {
+  const plan = plans.find(p => p.id === id) || savedPlans.find(p => p.id === id);
+  if (!plan) return;
+
+  if (isSaved(id)) {
+    savedPlans = savedPlans.filter(p => p.id !== id);
+  } else {
+    savedPlans.push(plan);
+  }
+  localStorage.setItem('hiddentravel_saved', JSON.stringify(savedPlans));
+  updateBadge();
+  renderResults();
+  if (activeId === id) showDetail(id);
+  if (document.getElementById('page-saved').classList.contains('visible')) renderSaved();
+}
+
+function updateBadge() {
+  const badge = document.getElementById('saved-badge');
+  badge.textContent = savedPlans.length;
+  badge.classList.toggle('show', savedPlans.length > 0);
+}
+
+// ── Pages ──
+function showPage(page) {
+  document.getElementById('page-explore').style.display = page==='explore' ? '' : 'none';
+  document.getElementById('page-saved').classList.toggle('visible', page==='saved');
+  document.getElementById('btn-explore').classList.toggle('active', page==='explore');
+  document.getElementById('btn-saved').classList.toggle('active', page==='saved');
+  if (page==='saved') renderSaved();
+}
+
+function renderSaved() {
+  const el = document.getElementById('saved-content');
+  if (!savedPlans.length) {
+    el.innerHTML = `<div class="saved-empty-state">
+      <div style="font-size:40px;opacity:0.2;margin-bottom:12px">☆</div>
+      <div style="font-family:'Noto Serif SC',serif;font-size:18px;font-style:italic;color:#5a6058">暂无收藏</div>
+      <div style="font-size:12px;color:#3a4038;margin-top:6px">在探索页面收藏心仪的旅行方案</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `<div class="saved-grid">${savedPlans.map(p => `
+    <div class="saved-card">
+      <div class="sc-title">${p.title}</div>
+      <div class="sc-loc">📍 ${p.location} · ${p.region}</div>
+      <div class="sc-desc">${p.description}</div>
+      <div class="sc-footer">
+        <div class="sc-days">${p.days}天 · ${p.type} · ${p.crowdLevel}</div>
+        <button class="sc-remove" onclick="removeSaved('${p.id}')">移除</button>
+      </div>
+    </div>
+  `).join('')}</div>`;
+}
+
+function removeSaved(id) {
+  savedPlans = savedPlans.filter(p => p.id !== id);
+  localStorage.setItem('hiddentravel_saved', JSON.stringify(savedPlans));
+  updateBadge();
+  renderSaved();
+}
+
+// Enter key
+document.getElementById('inp-from').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+// Init
+updateBadge();
+</script>
+</body>
+</html>
