@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>心灵之旅</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>.amap-logo,.amap-copyright{display:none!important}</style>
+<script src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_KEY"></script>
 <style>
 :root {
   --bg: #0d0f0e; --bg2: #141714; --bg3: #1a1f1b;
@@ -48,6 +48,17 @@ body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;
 .start-btn:hover{background:#3a7a4c}
 .retake-btn{width:100%;margin-top:10px;padding:12px;background:none;border:1px solid var(--border);border-radius:4px;color:var(--text3);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
 .retake-btn:hover{border-color:var(--text2);color:var(--text2)}
+
+/* SLIDER QUESTION */
+.q-slider-wrap{display:flex;flex-direction:column;gap:16px}
+.q-slider-labels{display:flex;justify-content:space-between;gap:16px}
+.q-slider-label-left,.q-slider-label-right{font-size:12px;color:var(--text2);line-height:1.5;max-width:45%}
+.q-slider-label-right{text-align:right}
+.q-slider{-webkit-appearance:none;width:100%;height:3px;border-radius:2px;background:linear-gradient(to right,var(--green-bright) 50%,var(--border) 50%);outline:none;cursor:pointer;transition:background 0.1s}
+.q-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--green-bright);border:2px solid var(--bg);box-shadow:0 0 8px rgba(109,184,130,0.5);cursor:pointer}
+.q-slider-value{text-align:center;font-family:'Space Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:2px}
+.q-slider-confirm{width:100%;padding:14px;background:var(--green);border:none;border-radius:4px;color:white;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:background 0.2s}
+.q-slider-confirm:hover{background:#3a7a4c}
 
 /* HEADER */
 header{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;background:rgba(13,15,14,0.94);backdrop-filter:blur(12px)}
@@ -295,47 +306,75 @@ header{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;alig
 </div>
 
 <script>
+// type: 'choice' | 'slider'
+// slider: {key, min, max, minLabel, minScore, maxLabel, maxScore}
 const QUESTIONS = [
-  { text:'旅行中独自待着一整天，你会感到...', options:[
-    {text:'充实，这正是我需要的',scores:{I:2}},
-    {text:'还好，偶尔有人说话更好',scores:{I:1,E:1}},
-    {text:'有点闷，更喜欢有人陪',scores:{E:2}}
+  { text:'旅行中独自待着一整天，你会...', options:[
+    {text:'非常充实，这正是我需要的',scores:{I:3,lone:2}},
+    {text:'还好，偶尔有人说两句更自在',scores:{I:1,E:1,lone:1}},
+    {text:'有点难受，更喜欢有人一起',scores:{E:2,lone:0}},
+    {text:'完全没问题，独处是一种享受',scores:{I:3,lone:3}}
   ]},
   { text:'理想的旅行节奏是...', options:[
-    {text:'走到哪算哪，临时决定',scores:{free:2}},
-    {text:'大方向定好，细节随缘',scores:{free:1,plan:1}},
-    {text:'每天行程提前规划好',scores:{plan:2}}
+    {text:'买好票再想去哪，走到哪算哪',scores:{free:3}},
+    {text:'大方向定好，每天随缘',scores:{free:2,plan:1}},
+    {text:'主要景点提前查好，细节弹性',scores:{free:1,plan:2}},
+    {text:'行程安排满，每天都有计划',scores:{plan:3}}
   ]},
-  { text:'更打动你的是...', options:[
-    {text:'无人的旷野、山川、星空',scores:{nature:2}},
-    {text:'两者都喜欢，看心情',scores:{nature:1,culture:1}},
-    {text:'古镇、遗迹、历史街巷',scores:{culture:2}}
+  { text:'更能打动你的风景是...', options:[
+    {text:'无人的旷野、星空、山间云雾',scores:{nature:3}},
+    {text:'古老的街巷、斑驳的墙壁、方言',scores:{culture:3}},
+    {text:'海边渔村的烟火气和潮湿的风',scores:{nature:1,culture:1,vibe:2}},
+    {text:'两种都行，随心情决定',scores:{nature:1,culture:1}}
+  ]},
+  { text:'计划临时被打乱时，你的第一反应是...', options:[
+    {text:'有点小慌，但很快调整过来',scores:{adapt:2}},
+    {text:'完全没关系，意外往往更有意思',scores:{adapt:3,free:1}},
+    {text:'有些不舒服，需要时间接受',scores:{adapt:1,plan:1}},
+    {text:'会明显焦虑，不确定感让我难受',scores:{plan:2,adapt:0}}
   ]},
   { text:'住宿方面，你的底线是...', options:[
-    {text:'帐篷、地铺、农家炕都无所谓',scores:{rough:2}},
-    {text:'有床有屋顶就行，不挑',scores:{rough:1,comfort:1}},
-    {text:'需要独卫，干净才能放松',scores:{comfort:2}}
+    {text:'帐篷、地铺、农家土炕都无所谓',scores:{rough:3}},
+    {text:'有床有屋顶，干不干净无所谓',scores:{rough:2,comfort:1}},
+    {text:'需要独立卫浴，但不挑档次',scores:{comfort:2}},
+    {text:'干净整洁是基本，最好有热水浴缸',scores:{comfort:3,spend:1}}
+  ]},
+  { text:'旅途中你会主动拍照或记录吗...', options:[
+    {text:'随手拍，但不执着，感受比记录重要',scores:{record:1}},
+    {text:'会认真拍，想留住那些瞬间',scores:{record:2,visual:1}},
+    {text:'基本不拍，用眼睛和心感受就够了',scores:{record:0,calm:1}},
+    {text:'会写日记或文字，照片也拍',scores:{record:3,vibe:1}}
+  ]},
+  { text:'遇到不熟悉的食物，你会...', options:[
+    {text:'必须尝！这就是旅行的意义',scores:{food:3}},
+    {text:'先观察一下，看起来好就试试',scores:{food:2}},
+    {text:'如果当地人推荐就试，否则算了',scores:{food:1}},
+    {text:'保守一点，选熟悉的吃',scores:{food:0}}
   ]},
   { text:'出行方式你更偏好...', options:[
-    {text:'自驾，随时停车看风景',scores:{drive:2}},
-    {text:'公共交通 + 大量步行',scores:{walk:2}},
-    {text:'看目的地，两种都行',scores:{drive:1,walk:1}}
+    {text:'自驾，走到哪停到哪',scores:{drive:3}},
+    {text:'公共交通为主，大量步行',scores:{walk:3}},
+    {text:'包车或拼车，灵活但不用自己开',scores:{drive:1,walk:1}},
+    {text:'骑行或徒步，用身体丈量距离',scores:{walk:2,thrill:1}}
   ]},
-  { text:'旅行中你更享受...', options:[
-    {text:'静静坐着发呆，观察细节',scores:{calm:2}},
-    {text:'有点体力消耗，但不极端',scores:{calm:1,thrill:1}},
-    {text:'爬山涉水，挑战身体极限',scores:{thrill:2}}
+  { text:'旅行中你更享受的状态是...', options:[
+    {text:'在某处发呆两小时，什么都不做',scores:{calm:3}},
+    {text:'边走边看，不紧不慢',scores:{calm:2,thrill:1}},
+    {text:'爬山涉水，有一定体力挑战',scores:{thrill:2,calm:1}},
+    {text:'极限挑战，越难越带劲',scores:{thrill:3}}
   ]},
-  { text:'预算风格上，你倾向于...', options:[
-    {text:'能省则省，体验比舒适重要',scores:{budget:2}},
-    {text:'适度花费，该省省该花花',scores:{budget:1,spend:1}},
-    {text:'住得好吃得好，该花就花',scores:{spend:2}}
-  ]},
-  { text:'最吸引你的旅行地描述是...', options:[
-    {text:'有故事感、时光流逝的氛围',scores:{vibe:2}},
-    {text:'视觉震撼、壮观的自然奇景',scores:{visual:2}},
-    {text:'两种都能打动我',scores:{vibe:1,visual:1}}
-  ]}
+  { type:'slider', text:'你与陌生人的距离感...', key:'social',
+    minLabel:'能聊就聊，旅途中的陌生人往往是惊喜', minScore:{E:3},
+    maxLabel:'保持距离，旅行是我和自己的事', maxScore:{I:3}
+  },
+  { type:'slider', text:'你对旅行预算的态度...', key:'budget_feel',
+    minLabel:'能省则省，钱省下来多走几个地方', minScore:{budget:3},
+    maxLabel:'该花就花，旅行的质感很重要', maxScore:{spend:3}
+  },
+  { type:'slider', text:'旅行结束后，你通常感到...', key:'energy',
+    minLabel:'精力充沛，已经在想下一次去哪了', minScore:{E:2,thrill:1},
+    maxLabel:'需要几天才能缓过来，身心都要充电', minScore2:{I:2,calm:1}
+  }
 ];
 
 const PERSONAS = [
@@ -343,7 +382,7 @@ const PERSONAS = [
   {id:'meditator',name:'山野冥想者',soul:'用脚丈量山川，用沉默对话自然，旅行是一种修行。',tags:['徒步','内省','自然'],match:s=>s.I>=2&&s.nature>=2&&s.walk>=1},
   {id:'cloud',name:'云端漫步者',soul:'迷恋高处的风和低处看不见的村庄，去没有信号的地方待几天。',tags:['高原','孤独','云雾'],match:s=>s.nature>=2&&s.thrill>=1&&s.I>=1},
   {id:'listener',name:'林间聆听者',soul:'走进树林，才发现城市有多吵，我需要这种安静。',tags:['森林','独处','慢行'],match:s=>s.nature>=2&&s.calm>=2&&s.I>=2},
-  {id:'lightchaser',name:'旷野追光人',soul:'专门去找那些光线刚好的瞬间，为了一个日出可以爬三个小时。',tags:['摄影感','晨昏','旷野'],match:s=>s.nature>=2&&s.vibe>=1&&s.visual>=1},
+  {id:'lightchaser',name:'旷野追光人',soul:'专门去找那些光线刚好的瞬间，为了一个日出可以爬三个小时。',tags:['摄影感','晨昏','旷野'],match:s=>s.nature>=2&&(s.vibe>=1||s.visual>=1)&&s.record>=1},
   {id:'archaeologist',name:'时光考古者',soul:'每一块旧砖都藏着我想听的故事，历史是旅行最好的向导。',tags:['古迹','人文','历史'],match:s=>s.culture>=3&&s.vibe>=1},
   {id:'alley',name:'街巷漫游者',soul:'不去景点，只在小巷里走丢，最好迷路三次。',tags:['古镇','随性','人文'],match:s=>s.culture>=2&&s.free>=2},
   {id:'observer',name:'人间观察员',soul:'坐在市集角落，看人比看风景更有意思，生活本身就是风景。',tags:['市井','人文','内向'],match:s=>s.culture>=2&&s.I>=2&&s.calm>=1},
@@ -359,17 +398,17 @@ const PERSONAS = [
   {id:'solitary',name:'孤独行者',soul:'一个人旅行，才能真正和自己说上话，独处是礼物。',tags:['独旅','内省','自由'],match:s=>s.I>=3&&s.free>=1},
   {id:'healer',name:'失联疗愈者',soul:'出发是为了断开，不是为了打卡，需要一次彻底的消失。',tags:['疗愈','逃离','静心'],match:s=>s.I>=2&&s.calm>=2&&s.nature>=1},
   {id:'boundary',name:'边界消解者',soul:'在陌生地方，才感觉自己可以重新开始，旅行是一种重生。',tags:['蜕变','陌生感','内省'],match:s=>s.I>=2&&s.vibe>=2},
-  {id:'stillness',name:'静观流浪者',soul:'不赶路，不拍照，只是看着，让时间慢下来。',tags:['极简','当下','冥想'],match:s=>s.calm>=3&&s.I>=1},
+  {id:'stillness',name:'静观流浪者',soul:'不赶路，不拍照，只是看着，让时间慢下来。',tags:['极简','当下','冥想'],match:s=>s.calm>=3&&s.I>=1&&s.record<=1},
   {id:'glamper',name:'精致野奢客',soul:'白天爬山，晚上要有好床和热水，享受不妨碍野性。',tags:['野奢','舒适','自然'],match:s=>s.nature>=1&&s.comfort>=2&&s.spend>=1},
   {id:'resident',name:'慢城定居者',soul:'每次旅行都想象自己住在那里，旅行是在选择另一种生活。',tags:['慢城','生活感','沉浸'],match:s=>s.calm>=1&&s.culture>=1&&s.comfort>=1&&s.plan>=1},
-  {id:'foodie',name:'市井美食家',soul:'跟着当地人吃，才算真的到过那里，胃是最诚实的旅行记录。',tags:['美食','市井','在地'],match:s=>s.culture>=1&&s.E>=1&&s.comfort>=1}
+  {id:'foodie',name:'市井美食家',soul:'跟着当地人吃，才算真的到过那里，胃是最诚实的旅行记录。',tags:['美食','市井','在地'],match:s=>s.food>=2&&s.culture>=1&&s.E>=1}
 ];
 
 let answers=[],currentQ=0,scores={},persona=null,plans=[],savedPlans=JSON.parse(localStorage.getItem('sj_saved')||'[]'),activeId=null,map=null,markers=[],routeLine=null;
 
 function startQuiz(){
   answers=[];currentQ=0;
-  scores={I:0,E:0,free:0,plan:0,nature:0,culture:0,rough:0,comfort:0,drive:0,walk:0,calm:0,thrill:0,budget:0,spend:0,vibe:0,visual:0};
+  scores={I:0,E:0,free:0,plan:0,nature:0,culture:0,rough:0,comfort:0,drive:0,walk:0,calm:0,thrill:0,budget:0,spend:0,vibe:0,visual:0,lone:0,adapt:0,record:0,food:0,social:0,budget_feel:0,energy:0};
   document.getElementById('quiz-result').style.display='none';
   document.getElementById('quiz-question').style.display='block';
   renderQuiz();
@@ -381,7 +420,54 @@ function renderQuiz(){
   prog.innerHTML=QUESTIONS.map((_,i)=>`<div class="progress-dot ${i<currentQ?'done':i===currentQ?'active':''}"></div>`).join('');
   const qEl=document.getElementById('quiz-question');
   qEl.style.animation='none';qEl.offsetHeight;qEl.style.animation='fadeUp 0.35s ease';
-  qEl.innerHTML=`<div class="q-num">问题 ${currentQ+1} / ${QUESTIONS.length}</div><div class="q-text">${q.text}</div><div class="q-options">${q.options.map((o,i)=>`<button class="q-option" onclick="selectOption(${i})">${o.text}</button>`).join('')}</div>`;
+
+  if(q.type==='slider'){
+    qEl.innerHTML=`
+      <div class="q-num">问题 ${currentQ+1} / ${QUESTIONS.length}</div>
+      <div class="q-text">${q.text}</div>
+      <div class="q-slider-wrap">
+        <div class="q-slider-labels">
+          <span class="q-slider-label-left">${q.minLabel}</span>
+          <span class="q-slider-label-right">${q.maxLabel}</span>
+        </div>
+        <input type="range" class="q-slider" id="slider-input" min="0" max="100" value="50">
+        <div class="q-slider-value" id="slider-val">中间</div>
+        <button class="q-slider-confirm" onclick="confirmSlider()">确认 →</button>
+      </div>`;
+    const sl=document.getElementById('slider-input');
+    const updateSlider=()=>{
+      const v=parseInt(sl.value);
+      sl.style.background=`linear-gradient(to right,var(--green-bright) ${v}%,var(--border) ${v}%)`;
+      const el=document.getElementById('slider-val');
+      if(v<=20)el.textContent='← 非常偏左';
+      else if(v<=40)el.textContent='← 偏左';
+      else if(v<=60)el.textContent='居中';
+      else if(v<=80)el.textContent='偏右 →';
+      else el.textContent='非常偏右 →';
+    };
+    sl.addEventListener('input',updateSlider);
+    updateSlider();
+  } else {
+    qEl.innerHTML=`<div class="q-num">问题 ${currentQ+1} / ${QUESTIONS.length}</div><div class="q-text">${q.text}</div><div class="q-options">${q.options.map((o,i)=>`<button class="q-option" onclick="selectOption(${i})">${o.text}</button>`).join('')}</div>`;
+  }
+}
+
+function confirmSlider(){
+  const q=QUESTIONS[currentQ];
+  const v=parseInt(document.getElementById('slider-input').value);
+  const ratio=v/100;
+  // 左端分数 * (1-ratio) + 右端分数 * ratio
+  const leftScores=q.minScore||{};
+  const rightScores=q.maxScore||q.minScore2||{};
+  const allKeys=new Set([...Object.keys(leftScores),...Object.keys(rightScores)]);
+  allKeys.forEach(k=>{
+    const lv=leftScores[k]||0;
+    const rv=rightScores[k]||0;
+    const val=Math.round(lv*(1-ratio)+rv*ratio);
+    scores[k]=(scores[k]||0)+val;
+  });
+  answers.push(v);
+  setTimeout(()=>{currentQ++;currentQ<QUESTIONS.length?renderQuiz():showResult();},300);
 }
 
 function selectOption(i){
@@ -538,27 +624,47 @@ function selectPlan(id){
 
 function initMap(){
   if(map)return;
-  map=L.map('map',{zoomControl:false}).setView([35,104],4);
-  L.control.zoom({position:'topright'}).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:18}).addTo(map);
+  map=new AMap.Map('map',{
+    zoom:4,
+    center:[104,35],
+    mapStyle:'amap://styles/dark',
+    resizeEnable:true
+  });
   document.getElementById('map-hint').style.display='none';
 }
 
 function showPlanOnMap(plan){
-  markers.forEach(m=>map.removeLayer(m));markers=[];
-  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  markers.forEach(m=>{m.setMap(null)});markers=[];
+  if(routeLine){routeLine.setMap(null);routeLine=null;}
   const wps=plan.waypoints||[];
   const pts=wps.length>0?wps:[{lat:plan.lat,lng:plan.lng,name:plan.location,note:''}];
-  const latlngs=[];
+  const points=[];
   pts.forEach((wp,i)=>{
     if(!wp.lat||!wp.lng)return;
-    latlngs.push([wp.lat,wp.lng]);
-    const icon=L.divIcon({className:'',html:`<div style="width:26px;height:26px;border-radius:50%;background:#0d0f0e;border:2px solid #6db882;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:10px;color:#6db882;font-weight:700;box-shadow:0 0 12px rgba(109,184,130,0.35)">${i+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
-    const m=L.marker([wp.lat,wp.lng],{icon}).bindPopup(`<div style="font-family:'Noto Sans SC',sans-serif;font-size:13px;color:#e8e4d8;background:#1a1f1b;padding:10px 14px;border-radius:3px;border:1px solid #2a312b;min-width:130px"><strong style="color:#6db882">${wp.name}</strong>${wp.note?`<br><span style="color:#8a9088;font-size:11px">${wp.note}</span>`:''}</div>`).addTo(map);
-    markers.push(m);
+    points.push(new AMap.LngLat(wp.lng,wp.lat));
+    const content=`<div style="width:26px;height:26px;border-radius:50%;background:#0d0f0e;border:2px solid #6db882;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:10px;color:#6db882;font-weight:700;box-shadow:0 0 12px rgba(109,184,130,0.35);line-height:26px;text-align:center">${i+1}</div>`;
+    const marker=new AMap.Marker({
+      position:new AMap.LngLat(wp.lng,wp.lat),
+      content:content,
+      offset:new AMap.Pixel(-13,-13),
+      map:map
+    });
+    const info=new AMap.InfoWindow({
+      content:`<div style="font-family:'Noto Sans SC',sans-serif;font-size:13px;color:#333;padding:6px 10px;min-width:120px"><strong>${wp.name}</strong>${wp.note?`<br><span style="font-size:11px;color:#666">${wp.note}</span>`:''}</div>`,
+      offset:new AMap.Pixel(0,-28)
+    });
+    marker.on('click',()=>info.open(map,marker.getPosition()));
+    markers.push(marker);
   });
-  if(latlngs.length>1){routeLine=L.polyline(latlngs,{color:'#4a8c5c',weight:2,opacity:0.6,dashArray:'6,8'}).addTo(map);map.fitBounds(L.latLngBounds(latlngs),{padding:[40,40]});}
-  else if(latlngs.length===1){map.setView(latlngs[0],9);}
+  if(points.length>1){
+    routeLine=new AMap.Polyline({
+      path:points,strokeColor:'#4a8c5c',strokeWeight:2,strokeOpacity:0.7,
+      strokeStyle:'dashed',strokeDasharray:[6,8],map:map
+    });
+    map.setFitView(markers);
+  } else if(points.length===1){
+    map.setCenter(points[0]);map.setZoom(9);
+  }
 }
 
 function showDetail(plan){
