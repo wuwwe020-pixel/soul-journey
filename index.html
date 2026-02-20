@@ -67,6 +67,29 @@ header{padding:18px 32px;border-bottom:1px solid var(--border);display:flex;alig
 .sidebar::-webkit-scrollbar{width:3px}
 .sidebar::-webkit-scrollbar-thumb{background:var(--border)}
 
+/* MOBILE */
+@media(max-width:768px){
+  header{padding:14px 16px}
+  .logo{font-size:16px}
+  .logo-sub{display:none}
+  .persona-chip{margin-left:8px;font-size:9px;padding:4px 8px}
+  .nav-btn{padding:6px 10px;font-size:9px;letter-spacing:1px}
+  .app-layout{grid-template-columns:1fr}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border);overflow-y:visible}
+  .main-content{min-height:0}
+  #map{min-height:220px;max-height:260px}
+  .detail-panel{max-height:none;overflow-y:visible}
+  .detail-inner{padding:20px 16px}
+  .detail-title{font-size:20px}
+  .transport-grid{grid-template-columns:1fr}
+  .time-slots{padding-left:20px}
+  .search-panel{padding:20px 16px}
+  .q-text{font-size:18px}
+  .result-title{font-size:28px}
+  .saved-page{padding:20px 16px}
+  .saved-grid{grid-template-columns:1fr}
+}
+
 /* SEARCH */
 .search-panel{padding:28px 24px;border-bottom:1px solid var(--border)}
 .panel-tag{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--amber);margin-bottom:16px}
@@ -501,7 +524,16 @@ function selectPlan(id){
   document.querySelectorAll('.result-card').forEach(el=>el.classList.remove('active'));
   const rc=document.getElementById('rc-'+id);if(rc)rc.classList.add('active');
   const plan=plans.find(p=>p.id===id);
-  if(plan){showPlanOnMap(plan);showDetail(plan);}
+  if(plan){
+    showPlanOnMap(plan);
+    showDetail(plan);
+    // 手机上自动滚动到详情区域
+    if(window.innerWidth<=768){
+      setTimeout(()=>{
+        document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'start'});
+      },100);
+    }
+  }
 }
 
 function initMap(){
