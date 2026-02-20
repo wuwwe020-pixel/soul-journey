@@ -20,6 +20,7 @@ body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC',sans-seri
 body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");opacity:0.6}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
 /* QUIZ OVERLAY */
 .quiz-overlay{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn 0.4s ease}
@@ -542,61 +543,22 @@ async function doSearch(){
   errEl.textContent='';
   const btn=document.getElementById('search-btn');
   const btnText=document.getElementById('btn-text');
-  btn.disabled=true;btnText.textContent='定制中...';
+  btn.disabled=true;btnText.textContent='寻找方案中...';
 
-  const systemPrompt=`你是一位深度旅行顾问，专门根据旅行者的性格偏好定制真实、具体、有深度的旅行方案。
+  // ── 第一步：只请求列表（快）──
+  const listPrompt=`你是旅行顾问，根据用户人格快速推荐5个旅行目的地。
+用户人格：「${persona.name}」——${persona.soul}
+标签：${persona.tags.join('、')}
 
-用户的旅行人格是「${persona.name}」——${persona.soul}
-性格标签：${persona.tags.join('、')}
+返回纯JSON：
+{"plans":[{"id":"唯一字符串","title":"诗意方案名","location":"具体地点","region":"省份","lat":纬度,"lng":经度,"whyYou":"为什么适合此人格，一句话","matchScore":"85%","type":"山野/古迹/水乡/沙漠/草原/海岸/峡谷/高原/边地","crowd":"极少人/较少人/偶有游客","season":"最佳季节","days":天数数字}]}
 
-请根据此人格推荐5个旅行方案，返回纯JSON格式：
-{
-  "plans": [
-    {
-      "id": "唯一id",
-      "title": "诗意方案名",
-      "location": "具体地点",
-      "region": "省份",
-      "lat": 纬度,
-      "lng": 经度,
-      "whyYou": "为什么特别适合「${persona.name}」，结合人格一句话说明",
-      "matchScore": "85%",
-      "type": "山野/古迹/水乡/沙漠/草原/海岸/峡谷/高原/边地",
-      "crowd": "极少人/较少人/偶有游客",
-      "season": "最佳季节",
-      "days": 天数数字,
-      "itinerary": [
-        {
-          "day": 1,
-          "title": "当天主题",
-          "morning": "上午具体去哪做什么耗时多久，50字内",
-          "afternoon": "下午具体去哪做什么耗时多久，50字内",
-          "evening": "傍晚具体去哪做什么耗时多久，50字内"
-        }
-      ],
-      "transport": {
-        "arrival": "如何抵达（交通工具+大概价格）",
-        "local": "当地如何移动（具体说明）"
-      },
-      "stay": {
-        "type": "住宿类型",
-        "price": "价格区间如80-150元/晚",
-        "reason": "为什么符合你的风格"
-      },
-      "food": ["特色食物1","特色食物2","特色食物3"],
-      "waypoints": [
-        {"name": "地点名","lat": 纬度,"lng": 经度,"day": 1,"note": "一句话说明"}
-      ]
-    }
-  ]
-}
+要求：5个方案类型各不同，地点真实，坐标准确。只返回JSON。`;
 
-要求：推荐真实存在的地方，坐标准确，行程具体不泛泛，每个方案类型不同，突出与用户人格的匹配感。只返回JSON。`;
-
-  const userMsg=`目标地区：${region}\n出行天数：${days}天\n出发时间：${time}\n旅行人格：${persona.name}\n\n请推荐5个最适合我的旅行方案。`;
+  const userMsg=`地区：${region}，${days}天，${time}，人格：${persona.name}，推荐4个方案。`;
 
   try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'glm-4-flash',max_tokens:4500,messages:[{role:'system',content:systemPrompt},{role:'user',content:userMsg}]})});
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'glm-4-flash',max_tokens:1000,messages:[{role:'system',content:listPrompt},{role:'user',content:userMsg}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(`API错误 ${res.status}: ${JSON.stringify(e)}`);}
     const data=await res.json();
     const raw=data.choices?.[0]?.message?.content||'{}';
@@ -605,9 +567,49 @@ async function doSearch(){
     try{parsed=JSON.parse(clean);}catch(e){throw new Error('AI返回格式异常，请重试');}
     plans=parsed.plans||[];
     renderResults();
-    if(plans.length>0){initMap();selectPlan(plans[0].id);}
+    if(plans.length>0){initMap();showPlanOnMap(plans[0]);setActiveCard(plans[0].id);}
   }catch(e){errEl.textContent='错误：'+e.message;}
   finally{btn.disabled=false;btnText.textContent='为我定制行程';}
+}
+
+// ── 第二步：点击方案后加载详情 ──
+async function loadDetail(plan){
+  const el=document.getElementById('detail-inner');
+  el.style.display='block';
+  document.getElementById('detail-empty').style.display='none';
+  el.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text3);font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px">
+    <div style="margin-bottom:12px;font-size:24px;animation:spin 1.2s linear infinite;display:inline-block">⟳</div><br>正在生成详细行程...
+  </div>`;
+
+  const detailPrompt=`你是旅行顾问，为用户生成一个旅行目的地的完整行程详情。
+用户人格：「${persona.name}」——${persona.soul}
+
+返回纯JSON（只返回单个plan对象，不是数组）：
+{
+  "itinerary":[{"day":1,"title":"主题","morning":"上午具体安排50字内","afternoon":"下午具体安排50字内","evening":"傍晚具体安排50字内"}],
+  "transport":{"arrival":"如何抵达，含交通工具和大概价格","local":"当地如何移动"},
+  "stay":{"type":"住宿类型","price":"价格区间如80-150元/晚","reason":"为什么符合你的风格"},
+  "food":["特色食物1","特色食物2","特色食物3"],
+  "waypoints":[{"name":"地点名","lat":纬度,"lng":经度,"day":1,"note":"一句话说明"}]
+}
+只返回JSON。`;
+
+  const userMsg2=`目的地：${plan.location}（${plan.region}），${plan.days}天行程，用户人格：${plan.title}，请生成完整详情。`;
+
+  try{
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'glm-4-flash',max_tokens:2500,messages:[{role:'system',content:detailPrompt},{role:'user',content:userMsg2}]})});
+    if(!res.ok)throw new Error('详情加载失败');
+    const data=await res.json();
+    const raw=data.choices?.[0]?.message?.content||'{}';
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const detail=JSON.parse(clean);
+    // 合并到plan
+    Object.assign(plan,detail);
+    showDetail(plan);
+    showPlanOnMap(plan);
+  }catch(e){
+    el.innerHTML=`<div style="padding:32px;text-align:center;color:var(--red);font-family:'Space Mono',monospace;font-size:11px">详情加载失败，请重试</div>`;
+  }
 }
 
 function renderResults(){
@@ -632,20 +634,27 @@ function renderResults(){
     </div>`).join('');
 }
 
-function selectPlan(id){
+function setActiveCard(id){
   activeId=id;
   document.querySelectorAll('.result-card').forEach(el=>el.classList.remove('active'));
   const rc=document.getElementById('rc-'+id);if(rc)rc.classList.add('active');
+}
+
+function selectPlan(id){
+  setActiveCard(id);
   const plan=plans.find(p=>p.id===id);
-  if(plan){
-    showPlanOnMap(plan);
+  if(!plan)return;
+  showPlanOnMap(plan);
+  // 已有详情直接显示，否则加载
+  if(plan.itinerary&&plan.itinerary.length>0){
     showDetail(plan);
-    // 手机上自动滚动到详情区域
-    if(window.innerWidth<=768){
-      setTimeout(()=>{
-        document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'start'});
-      },100);
-    }
+  } else {
+    loadDetail(plan);
+  }
+  if(window.innerWidth<=768){
+    setTimeout(()=>{
+      document.getElementById('detail-panel').scrollIntoView({behavior:'smooth',block:'start'});
+    },100);
   }
 }
 
